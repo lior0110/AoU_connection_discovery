@@ -1,18 +1,19 @@
 # Laboratory Measurement Connection Discovery via Advanced Statistics and Explainable AI
 
-[![All of Us Workbench](https://img.shields.io/badge/Platform-All_of_Us_Workbench-blue.svg)](https://www.researchallofus.org/)
+[![All of Us Workspace](https://img.shields.io/badge/All_of_Us-Workbench_Workspace-blue.svg)](https://workbench.verily.com/workspaces/connection-discovery)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-brightgreen.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Repository for code developed in the *All of Us* Researcher Workbench.**
-> This project investigates whether advanced non-monotonic statistical methods and Explainable AI (XAI) feature attribution techniques can discover novel, complex biological relationships between continuous laboratory measurements that traditional linear correlation methods fail to detect.
+> **Repository for code developed in the *All of Us* Researcher Workbench.**  
+> 🔗 **Workspace Link:** [All of Us Workbench - Connection Discovery Workspace](https://workbench.verily.com/workspaces/connection-discovery)
+
+This project investigates whether advanced non-monotonic statistical methods and Explainable AI (XAI) feature attribution techniques can discover novel, complex biological relationships between continuous laboratory measurements that traditional linear correlation methods fail to detect.
 
 ---
 
 ## 📌 Table of Contents
 
 - [Research Overview](#-research-overview)
-- [Repository Structure & Pipeline](#-repository-structure--pipeline)
+- [Repository Structure](#-repository-structure)
 - [Methodological Framework](#-methodological-framework)
   - [Statistical Correlation Metrics](#1-statistical-correlation-metrics)
   - [Explainable AI & Machine Learning](#2-explainable-ai--machine-learning)
@@ -26,32 +27,27 @@
 
 ## 🔬 Research Overview
 
-Standard clinical analysis heavily relies on linear ($r$) or monotonic ($\rho$) correlation frameworks to understand biomarker associations. However, human biological systems exhibit non-linear, state-dependent, and multi-phasic dependencies.
+Standard clinical analysis heavily relies on linear ($r$) or monotonic ($\rho$) correlation frameworks to understand biomarker associations. However, human biological systems exhibit complex, non-linear, state-dependent, and multi-phasic dependencies.
 
-Using **HbA1c** and **Insulin** as anchor target analytes, this project maps systemic, non-linear connections across broader laboratory test panels within the *All of Us* Electronic Health Record (EHR) database.
+Using **HbA1c** and **Insulin** as initial anchor target analytes, this project maps systemic, non-linear connections across broader laboratory test panels within the *All of Us* Electronic Health Record (EHR) database.
 
 ---
 
-## 📁 Repository Structure & Pipeline
+## 📁 Repository Structure
 
 ```text
 AoU_connection_discovery/
 │
-├── results/                                # Partial and processed result outputs
+├── results/                                # Output directory for partial and processed result files
+├── .gitignore                            # Git exclusion rules
+├── Helper_Functions.py                     # Central utility library (unit conversion, stats, evaluations)
+├── lior_XAI_env.yaml                       # Conda environment definition
 │
-├── Helper_Functions.py                     # Central utility module (normalization, stats, evaluation)
-├── lior_XAI_env.yaml                       # Conda environment specifications
-│
-├── 1. Data Retrieval & Cleaning
-│   ├── get single lab data with cleaning.ipynb  # Initial regex extraction & co-occurring lab retrieval, Unit normalization, and long-to-wide pivot
-│
-├── 2. Semantic Harmonization & More Cleaning
-│   └── columns semantic clustering.ipynb        # SapBERT/MedEmbed embedding & agglomerative clustering
-│   └── data cleaning 1.ipynb                    # cluster validation and splitting, and entropy filtering
-│
-└── 3. Experiment 1 code
-    ├── Correlations tests.ipynb                 # Non-monotonic metric execution (dcor vs. traditional) 
-    └── look at correlations results.ipynb       # Look at closeness of Non-monotonic results (from Correlations tests.ipynb) to traditional results
+├── get single lab data with cleaning.ipynb  # Step 1: Regex extraction of anchor labs & co-occurring lab retrieval
+├── columns semantic clustering.ipynb        # Step 2: SapBERT/MedEmbed embedding & agglomerative clustering
+├── data cleaning 1.ipynb                    # Step 3: Distribution verification, unit normalization & entropy filtering
+├── Correlations tests.ipynb                 # Step 4: Non-monotonic metric execution & GBDT/XAI model training
+└── look at correlations results.ipynb       # Step 5: Result analysis, consensus evaluation & visualizations
 ```
 
 ---
@@ -139,10 +135,8 @@ To benchmark non-linear feature importance against statistical metrics, we utili
 
 To replicate the execution environment locally or within a Jupyter instance:
 
-```bash
 # Clone the repository
-git clone https://github.com/lior0110/AoU_connection_discovery.git
-cd AoU_connection_discovery
+add [https://github.com/lior0110/AoU_connection_discovery.git](https://github.com/lior0110/AoU_connection_discovery.git) to Git repositories in apps section
 
 # Create and activate conda environment
 conda env create -f lior_XAI_env.yaml
