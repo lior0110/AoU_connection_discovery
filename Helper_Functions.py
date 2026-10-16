@@ -1,13 +1,30 @@
+    
+import os
+
 import numpy as np
 import pandas as pd
 from scipy.stats import entropy, wasserstein_distance
 from scipy.spatial.distance import jensenshannon
+from sklearn.preprocessing import StandardScaler
 
 import seaborn as sns
+
 import networkx as nx
 
-import seaborn as sns
 import matplotlib.pyplot as plt
+
+def trim_by_quantile(s: pd.Series, q_lower: float = 0.05, q_upper: float = 0.95) -> pd.Series:
+    """
+    Trims a pandas Series to include only values within specified quantile bounds.
+    """
+    clean_s = s.dropna()
+    if clean_s.empty:
+        return clean_s
+    
+    q_min = clean_s.quantile(q_lower)
+    q_max = clean_s.quantile(q_upper)
+    
+    return clean_s[(clean_s >= q_min) & (clean_s <= q_max)]
 
 def compute_kl_divergence(
     v1: np.ndarray, v2: np.ndarray, num_bins: int = 50, eps: float = 1e-10
@@ -66,8 +83,10 @@ def evaluate_distribution_closeness(
     s_threshold_ratio: float = 2.0,
     jsd_threshold: float = 0.25,
     num_bins: int = 50,
-    use_rule: str = "one_of"  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
-) -> dict:
+    use_rule: str = "one_of",  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
+    trim_outliers: bool = True,
+    quantile_trim_bounds: tuple[float, float] = (0.05, 0.95),
+    ) -> dict:
     """Evaluates whether two lab distributions are close using dual-scale
 
     (Linear + Log) relative Earth Mover's Distance (EMD) and Normalized
@@ -94,32 +113,45 @@ def evaluate_distribution_closeness(
           - 'one_of': Pass one of the EMD test or the JSD test.
           - 'all_of': Pass both the EMD test and the JSD test.
           - 'emd_and_jsd': Pass one of the EMD test and the JSD test.
+    trim_outliers : bool, default=True
+        Whether to trim outliers from the input series.
+    quantile_trim_bounds : tuple[float, float], default=(0.05, 0.95)
+        The lower and upper quantile bounds for trimming outliers.
     """
+# 1. Clean missing values and optionally trim to quantile band
+    s1_clean = s1.dropna()
+    s2_clean = s2.dropna()
 
-    # 1. Clean missing values
-    v1_lin = s1.dropna().to_numpy()
-    v2_lin = s2.dropna().to_numpy()
+    if trim_outliers:
+        s1_trimmed = trim_by_quantile(s1_clean, quantile_trim_bounds[0], quantile_trim_bounds[1])
+        s2_trimmed = trim_by_quantile(s2_clean, quantile_trim_bounds[0], quantile_trim_bounds[1])
+    else:
+        s1_trimmed = s1_clean
+        s2_trimmed = s2_clean
+
+    v1_lin = s1_trimmed.to_numpy()
+    v2_lin = s2_trimmed.to_numpy()
 
     if len(v1_lin) == 0 or len(v2_lin) == 0:
-        raise ValueError("One or both Series contain no non-null observations.")
+        raise ValueError("One or both Series contain no valid observations after trimming.")
 
     # -------------------------------------------------------------------------
     # LINEAR SCALE EVALUATION
     # -------------------------------------------------------------------------
-    # print("lin test")
     emd_lin = wasserstein_distance(v1_lin, v2_lin)
 
-    spread1_lin = s1.quantile(q_upper) - s1.quantile(q_lower)
-    spread2_lin = s2.quantile(q_upper) - s2.quantile(q_lower)
+    # Spread computed on the trimmed or full data
+    spread1_lin = s1_clean.quantile(q_upper) - s1_clean.quantile(q_lower)
+    spread2_lin = s2_clean.quantile(q_upper) - s2_clean.quantile(q_lower)
     pooled_spread_lin = (spread1_lin + spread2_lin) / 2.0
+    
     rel_emd_lin = (
         emd_lin / pooled_spread_lin if pooled_spread_lin > 0 else np.nan
     )
 
-    # Call external helper
     jsd_lin = compute_normalized_jsd(v1_lin, v2_lin, num_bins=num_bins)
 
-    # Self-Distance Noise Floor Baseline (Linear)
+    # Baseline Noise Floor Calculation
     rng = np.random.default_rng(seed=42)
     half_size = len(v1_lin) // 2
     shuffled_v1 = rng.permutation(v1_lin)
@@ -130,94 +162,72 @@ def evaluate_distribution_closeness(
     )
 
     if use_rule == "one_of":
-        is_close_lin = (rel_emd_lin < q_threshold_ratio) or (emd_lin < s_threshold_ratio*self_emd_baseline) or (jsd_lin < jsd_threshold)
+        is_close_lin = (rel_emd_lin < q_threshold_ratio) or (emd_lin < s_threshold_ratio * self_emd_baseline) or (jsd_lin < jsd_threshold)
     elif use_rule == "all_of":
-        is_close_lin = (rel_emd_lin < q_threshold_ratio) and (emd_lin < s_threshold_ratio*self_emd_baseline) and (jsd_lin < jsd_threshold)
+        is_close_lin = (rel_emd_lin < q_threshold_ratio) and (emd_lin < s_threshold_ratio * self_emd_baseline) and (jsd_lin < jsd_threshold)
     elif use_rule == "emd_and_jsd":
-        is_close_lin = ((rel_emd_lin < q_threshold_ratio) or (emd_lin < s_threshold_ratio*self_emd_baseline)) and (jsd_lin < jsd_threshold)
+        is_close_lin = ((rel_emd_lin < q_threshold_ratio) or (emd_lin < s_threshold_ratio * self_emd_baseline)) and (jsd_lin < jsd_threshold)
     else:
-        
-        raise ValueError(f"Invalid use_rule '{use_rule}'. Must be 'one_of', 'all_of', or 'emd_and_jsd'.")
-    # is_close_lin = (rel_emd_lin < threshold_ratio) and (jsd_lin < jsd_threshold)
+        raise ValueError(f"Invalid use_rule '{use_rule}'.")
 
     # -------------------------------------------------------------------------
     # LOG SCALE EVALUATION
     # -------------------------------------------------------------------------
     v1_pos = v1_lin[v1_lin > 0]
     v2_pos = v2_lin[v2_lin > 0]
-    # print(f"len(v1_pos) = {len(v1_pos)}")
-    # print(f"len(v2_pos) = {len(v2_pos)}")
 
     if len(v1_pos) > 0 and len(v2_pos) > 0:
-        # print("log test")
         v1_log = np.log(v1_pos)
         v2_log = np.log(v2_pos)
 
         emd_log = wasserstein_distance(v1_log, v2_log)
 
-        s1_pos, s2_pos = s1[s1 > 0], s2[s2 > 0]
-        spread1_log = np.log(s1_pos.quantile(q_upper)) - np.log(
-            s1_pos.quantile(q_lower)
-        )
-        spread2_log = np.log(s2_pos.quantile(q_upper)) - np.log(
-            s2_pos.quantile(q_lower)
-        )
+        s1_pos, s2_pos = s1_clean[s1_clean > 0], s2_clean[s2_clean > 0]
+        spread1_log = np.log(s1_pos.quantile(q_upper)) - np.log(s1_pos.quantile(q_lower))
+        spread2_log = np.log(s2_pos.quantile(q_upper)) - np.log(s2_pos.quantile(q_lower))
         pooled_spread_log = (spread1_log + spread2_log) / 2.0
+        
         rel_emd_log = (
             emd_log / pooled_spread_log if pooled_spread_log > 0 else np.nan
         )
-        # print(f"pooled_spread_log = {pooled_spread_log}")
 
-        # Call external helper on log scale
         jsd_log = compute_normalized_jsd(v1_log, v2_log, num_bins=num_bins)
 
-        # Self-Distance Noise Floor Baseline (Linear)
-        rng = np.random.default_rng(seed=42)
-        half_size = len(v1_log) // 2
+        half_size_log = len(v1_log) // 2
         shuffled_v1_log = rng.permutation(v1_log)
         self_emd_log_baseline = (
-            wasserstein_distance(shuffled_v1_log[:half_size], shuffled_v1_log[half_size:])
-            if half_size > 0
+            wasserstein_distance(shuffled_v1_log[:half_size_log], shuffled_v1_log[half_size_log:])
+            if half_size_log > 0
             else 0.0
         )
 
         if use_rule == "one_of":
-            is_close_log = (rel_emd_log < q_threshold_ratio) or (emd_log < s_threshold_ratio*self_emd_log_baseline) or (jsd_log < jsd_threshold)
+            is_close_log = (rel_emd_log < q_threshold_ratio) or (emd_log < s_threshold_ratio * self_emd_log_baseline) or (jsd_log < jsd_threshold)
         elif use_rule == "all_of":
-            is_close_log = (rel_emd_log < q_threshold_ratio) and (emd_log < s_threshold_ratio*self_emd_log_baseline) and (jsd_log < jsd_threshold)
+            is_close_log = (rel_emd_log < q_threshold_ratio) and (emd_log < s_threshold_ratio * self_emd_log_baseline) and (jsd_log < jsd_threshold)
         elif use_rule == "emd_and_jsd":
-            is_close_log = ((rel_emd_log < q_threshold_ratio) or (emd_log < s_threshold_ratio*self_emd_log_baseline)) and (jsd_log < jsd_threshold)
+            is_close_log = ((rel_emd_log < q_threshold_ratio) or (emd_log < s_threshold_ratio * self_emd_log_baseline)) and (jsd_log < jsd_threshold)
         else:
-            raise ValueError(f"Invalid use_rule '{use_rule}'. Must be 'one_of', 'all_of', or 'emd_and_jsd'.")
-        # is_close_log = (rel_emd_log < threshold_ratio) and (
-        #     jsd_log < jsd_threshold
-        # )
+            raise ValueError(f"Invalid use_rule '{use_rule}'.")
     else:
         emd_log, pooled_spread_log, self_emd_log_baseline, rel_emd_log, jsd_log = np.nan, np.nan, np.nan, np.nan, np.nan
         is_close_log = False
 
-    # -------------------------------------------------------------------------
-    # DUAL-SCALE DECISION
-    # -------------------------------------------------------------------------
-    # Passes if close on EITHER scale; alerts ONLY IF BOTH fail
     is_close_dual_scale = is_close_lin or is_close_log
 
     return {
-        # Linear Outputs
         "raw_emd_linear": emd_lin,
         "pooled_spread_linear": pooled_spread_lin,
         "self_noise_baseline": self_emd_baseline,
         "relative_emd_linear": rel_emd_lin,
         "jsd_linear": jsd_lin,
         "is_close_linear": is_close_lin,
-        # Log Outputs
         "raw_emd_log": emd_log,
         "pooled_spread_log": pooled_spread_log,
         "self_noise_log_baseline": self_emd_log_baseline,
         "relative_emd_log": rel_emd_log,
         "jsd_log": jsd_log,
         "is_close_log": is_close_log,
-        # Summary Flags
         "is_close_dual_scale": is_close_dual_scale,
         "alert_mismatch": not is_close_dual_scale,
     }
@@ -231,7 +241,9 @@ def audit_lab_unit_distributions_dual_scale(
     emd_q_threshold: float = 0.25,
     emd_s_threshold: float = 2,
     jsd_threshold: float = 0.25,
-    use_rule: str = "one_of"  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
+    use_rule: str = "one_of",  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
+    trim_outliers: bool = True,
+    quantile_trim_bounds: tuple[float, float] = (0.05, 0.95),
 ) -> pd.DataFrame:
     """Audits unit distributions across both Linear and Log scales.
 
@@ -300,6 +312,8 @@ def audit_lab_unit_distributions_dual_scale(
                 s_threshold_ratio=emd_s_threshold, 
                 jsd_threshold=jsd_threshold, 
                 use_rule=use_rule,
+                trim_outliers=trim_outliers,
+                quantile_trim_bounds=quantile_trim_bounds,
             )
             
             # -------------------------------------------------------------
@@ -393,7 +407,9 @@ def validate_and_split_cluster(
     emd_s_thresh_ratio: float = 1.5,
     jsd_threshold: float = 0.20,
     num_bins: int = 50,
-    use_rule: str = "one_of"  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
+    use_rule: str = "one_of",  # Default: 'either' (Options: 'one_of', 'all_of', or 'emd_and_jsd')
+    trim_outliers: bool = True,
+    quantile_trim_bounds: tuple[float, float] = (0.05, 0.95)
 ) -> dict:
     """
     Validates a candidate cluster and splits it if required.
@@ -478,6 +494,8 @@ def validate_and_split_cluster(
                 jsd_threshold=jsd_threshold,
                 num_bins=num_bins,
                 use_rule=use_rule,
+                trim_outliers=trim_outliers,
+                quantile_trim_bounds=quantile_trim_bounds,
             )
 
             is_close = dist_res["is_close_dual_scale"]
@@ -494,6 +512,8 @@ def validate_and_split_cluster(
             #         jsd_threshold=jsd_threshold,
             #         num_bins=num_bins,
             #         use_rule=use_rule,
+            #         trim_outliers=trim_outliers,
+            #         quantile_trim_bounds=quantile_trim_bounds,
             #     )
 
             #     is_close = dist_res["is_close_dual_scale"]
@@ -682,11 +702,7 @@ def get_columns_perplexity(df: pd.DataFrame, n_bins: int = -1) -> pd.Series:
             results[col] = 0
 
     return pd.Series(results, dtype=float)
-    
-import os
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
+
 
 
 def plot_top_correlations(
