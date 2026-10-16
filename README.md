@@ -121,7 +121,7 @@ To benchmark non-linear feature importance against statistical metrics, we utili
 ## 🧪 Experimental Design
 
 ### **Experiment 1: The Correlation Hierarchy**
-* **Goal:** Quantify the yield of novel biological relationships discovered exclusively through non-monotonic metrics ($\text{dCor}$) vs. linear ($r$) and monotonic ($\rho$) metrics.
+* **Goal:** Quantify the yield of novel biological relationships discovered exclusively through non-monotonic metrics ($\text{dCor}$) vs. linear ($r$) and monotonic ($\rho$ + τ) metrics.
 
 ### **Experiment 2: Multi-Method Consensus Evaluation**
 * **Goal:** Evaluate cross-method agreement across non-monotonic statistical metrics ($\text{MIC}$, $\xi$, $D$) and tree-based XAI metrics (XGBoost, CatBoost, LightGBM, SHAP) to isolate high-confidence non-linear associations.
@@ -156,8 +156,8 @@ conda activate lior_XAI_env
 To run the complete pipeline sequentially:
 
 1. **`get single lab data with cleaning.ipynb`**: Extract anchor lab co-occurrences.
-2. **`data cleaning 1.ipynb`**: Perform unit harmonization, pivot data, and apply quality filters.
-3. **`columns semantic clustering.ipynb`**: Cluster synonymous test names using medical embeddings.
+2. **`columns semantic clustering.ipynb`**: Cluster synonymous test names using medical embeddings.
+3. **`data cleaning 1.ipynb`**: Perform unit harmonization, pivot data, and apply quality filters.
 4. **`Correlations tests.ipynb`**: Calculate linear, monotonic, and non-monotonic statistics alongside GBDT model training.
 5. **`look at correlations results.ipynb`**: Analyze results, evaluate consensus, and generate comparative visualizations.
 
