@@ -37,21 +37,21 @@ Using **HbA1c** and **Insulin** as anchor target analytes, this project maps sys
 ```text
 AoU_connection_discovery/
 │
-├── results/                                # Partial and processed result outputs (matrices, metrics)
+├── results/                                # Partial and processed result outputs
 │
 ├── Helper_Functions.py                     # Central utility module (normalization, stats, evaluation)
 ├── lior_XAI_env.yaml                       # Conda environment specifications
 │
 ├── 1. Data Retrieval & Cleaning
-│   ├── get single lab data with cleaning.ipynb  # Initial regex extraction & co-occurring lab retrieval
-│   └── data cleaning 1.ipynb                    # Unit normalization, long-to-wide pivot, entropy filtering
+│   ├── get single lab data with cleaning.ipynb  # Initial regex extraction & co-occurring lab retrieval, Unit normalization, and long-to-wide pivot
 │
-├── 2. Semantic Harmonization
+├── 2. Semantic Harmonization & More Cleaning
 │   └── columns semantic clustering.ipynb        # SapBERT/MedEmbed embedding & agglomerative clustering
+│   └── data cleaning 1.ipynb                    # cluster validation and splitting, and entropy filtering
 │
-└── 3. Statistical Analysis & Modeling
-    ├── Correlations tests.ipynb                 # Non-monotonic metric execution & tree model training
-    └── look at correlations results.ipynb       # Consensus evaluation, XAI attribution & visualization
+└── 3. Experiment 1 code
+    ├── Correlations tests.ipynb                 # Non-monotonic metric execution (dcor vs. traditional) 
+    └── look at correlations results.ipynb       # Look at closeness of Non-monotonic results (from Correlations tests.ipynb) to traditional results
 ```
 
 ---
@@ -63,7 +63,9 @@ AoU_connection_discovery/
 We assess continuous lab associations across three levels of dependency:
 
 - **Linear:** Pearson Correlation ($r$)
-- **Monotonic:** Spearman Rank Correlation ($\rho$)
+- **Monotonic:**
+  - Spearman Rank Correlation ($\rho$)
+  - Kendall rank correlation (τ)
 - **Non-Monotonic / Complex:**
   - Distance Correlation ($\text{dCor}$)
   - Maximal Information Coefficient ($\text{MIC}$)
