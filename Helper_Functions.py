@@ -334,7 +334,7 @@ def audit_lab_unit_distributions_dual_scale(
                     "raw_emd_linear": distribution_closeness['raw_emd_linear'],
                     "pooled_spread_linear": distribution_closeness['pooled_spread_linear'],
                     "self_noise_baseline": distribution_closeness['self_noise_baseline'],
-                    "relative_emd_linear": distribution_closeness['pooled_spread_linear'],
+                    "relative_emd_linear": distribution_closeness['relative_emd_linear'],
                     "jsd_linear": distribution_closeness['jsd_linear'],
                     "is_close_linear": distribution_closeness['is_close_linear'],
                     "alert_linear": not distribution_closeness['is_close_linear'],
@@ -559,7 +559,7 @@ def validate_and_split_cluster(
                 "raw_emd_linear": dist_res['raw_emd_linear'],
                 "pooled_spread_linear": dist_res['pooled_spread_linear'],
                 "self_noise_baseline": dist_res['self_noise_baseline'],
-                "relative_emd_linear": dist_res['pooled_spread_linear'],
+                "relative_emd_linear": dist_res['relative_emd_linear'],
                 "jsd_linear": dist_res['jsd_linear'],
                 "is_close_linear": dist_res['is_close_linear'],
                 "alert_linear": not dist_res['is_close_linear'],
@@ -623,7 +623,7 @@ def merge_clustered_columns(
     # 1. Preserve non-lab metadata columns (e.g., patient_id, age, race)
     clustered_cols_set = set(final_clusters_df["column_name"])
     # unclustered_cols = [col for col in df_wide.columns if col not in clustered_cols_set]
-    unclustered_cols = unclustered_cols
+    # unclustered_cols = unclustered_cols
     
     for col in unclustered_cols:
         merged_dict[col] = df_wide[col]
