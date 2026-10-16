@@ -713,8 +713,9 @@ def plot_top_correlations(
     max_len: int = 2000,
     fig_size: float = 10.0,
     plot_type: str = "kde",
-    random_state: int = 42,
+    random_state: int = None,
     save_dir: str = None,
+    experiment_name: str = "current_experiment",
     file_format: str = "png",
     dpi: int = 300,
 ):
@@ -736,10 +737,12 @@ def plot_top_correlations(
         Height/size of the JointGrid plot. Accepts a float (height) or (width, height) tuple.
     plot_type : str, default="kde"
         Type of central plot. Options are 'kde' (density contour) or 'scatter' (scatterplot).
-    random_state : int, default=42
+    random_state : int, default=None
         Seed used for reproducible downsampling.
     save_dir : str, optional
         path to directory where plot image files should be saved. If None, plots are not saved.
+    experiment_name : str, default="current_experiment"
+        Name of the experiment, used for subfolder creation.
     file_format : str, default="png"
         File format for saved images (e.g., 'png', 'pdf', 'svg').
     dpi : int, default=300
@@ -750,8 +753,10 @@ def plot_top_correlations(
     )
     n_plots = min(top_n, len(stats_df))
 
+    # Construct subfolder path: save_dir / target_col / experiment_name
     if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
+        output_dir = os.path.join(save_dir, target_col, experiment_name)
+        os.makedirs(output_dir, exist_ok=True)
 
     for i in range(n_plots):
         other_col = stats_df.index[i]
@@ -763,8 +768,8 @@ def plot_top_correlations(
         pair_df = data_df[[target_col, other_col]].dropna()
 
         # Check for empty datasets or zero-variance columns
-        if len(pair_df) < 3:
-            print(f"Skipping '{other_col}': Fewer than 3 valid data points.")
+        if len(pair_df) < 30:
+            print(f"Skipping '{other_col}': Fewer than 30 valid data points.")
             continue
 
         if (
@@ -819,21 +824,20 @@ def plot_top_correlations(
 
             # 3. Save plot if output directory is provided
             if save_dir:
-                # Sanitize filenames by replacing spaces or special characters
                 clean_target = (
-                    target_col.replace("/", "_")
+                    str(target_col)
+                    .replace("/", "_")
                     .replace("\\", "_")
                     .replace(" ", "_")
                 )
                 clean_other = (
-                    other_col.replace("/", "_")
+                    str(other_col)
+                    .replace("/", "_")
                     .replace("\\", "_")
                     .replace(" ", "_")
                 )
-                # filename = f"{save_name}.{file_format}"
-                # file_path = filename
-                filename = f"{target_col}_vs_{other_col}.{file_format}"
-                file_path = os.path.join(save_dir, filename)
+                filename = f"{clean_target}_vs_{clean_other}.{file_format}"
+                file_path = os.path.join(output_dir, filename)
 
                 g.savefig(file_path, bbox_inches="tight", dpi=dpi)
 
